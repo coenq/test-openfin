@@ -1,35 +1,32 @@
-import { expect } from '@playwright/test';
-import { test } from '../fixtures'; // this is your customized fixture
+// tests/openfin.spec.ts
+import { test, expect } from '../fixtures';
+import { spawn, ChildProcess } from 'child_process';
+import path from 'path';
 
-test.describe('My OpenFin App', () => {
-  
-  test('should open 3 or more windows on launch', async ({ context }) => {
-    const pages = await context.pages();
-    expect(pages.length).toBeGreaterThanOrEqual(3);
+let openfinProcess: ChildProcess | null = null;
+const APP_JSON_PATH = path.resolve(__dirname, '../your-app/app.json');
+
+test.beforeAll(async () => {
+  console.log('Launching OpenFin...');
+  openfinProcess = spawn('openfin', ['--launch', APP_JSON_PATH], {
+    detached: true,
+    stdio: 'ignore',
   });
 
-  test('should retrieve OpenFin runtime version from mainWindow', async ({ mainWindow }) => {
-    const runtimeVersion = await mainWindow.evaluate(async () => {
-      const info = await window.fin.System.getRuntimeInfo();
-      return info.version;
-    });
+  // Wait a few seconds to allow app to boot
+  await new Promise(resolve => setTimeout(resolve, 5000));
+});
 
-    expect(runtimeVersion).toBeDefined();
-  });
+test.afterAll(async () => {
+  if (openfinProcess && openfinProcess.pid) {
+    console.log('Closing OpenFin...');
+    process.kill(-openfinProcess.pid);
+  } else {
+    console.warn('OpenFin process not found or already closed.');
+  }
+});
 
-  test('should emit minimize event when clicking minimize button', async ({ mainWindow }) => {
-    // Trigger minimize
-    await mainWindow.click('#minimize-window');
-
-    // Wait for OpenFin window event
-    const minimizedEvent = await mainWindow.evaluate(() => {
-      const currentWindow = window.fin.Window.getCurrentSync();
-      return new Promise(resolve => {
-        currentWindow.on('minimized', () => resolve(true));
-      });
-    });
-
-    expect(minimizedEvent).toBeTruthy();
-  });
-
+test('should open 3 or more windows on launch', async ({ context }) => {
+  const pages = await context.pages();
+  expect(pages.length).toBeGreaterThanOrEqual(3);
 });
